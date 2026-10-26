@@ -24,7 +24,7 @@ El sitio abre directamente, sin cuentas, correos ni claves. Cualquier persona qu
 - `supabase/migrations/20260721_secure_cave_board.sql` cierra RLS y normaliza estados y prioridades.
 - `supabase/functions/cave-board/index.ts` contiene el backend protegido.
 - `supabase/config.toml` mantiene `verify_jwt = false` porque la funcion es de acceso abierto.
-- Tras cambiar la funcion, publicala con `supabase functions deploy cave-board`.
+- Al cambiar la funcion en `main`, el workflow `Deploy Supabase Function` la publica automaticamente (necesita el secreto `SUPABASE_ACCESS_TOKEN` en GitHub). Tambien puede publicarse a mano con `supabase functions deploy cave-board`.
 
 ## Uso
 
