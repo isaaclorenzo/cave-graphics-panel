@@ -6,13 +6,13 @@ Panel web interno para organizar tareas y recursos graficos del estudio. La list
 
 El sitio se publica con GitHub Pages desde la rama `main`:
 
-https://kratos561.github.io/cave-graphics-panel/
+https://isaaclorenzo.github.io/cave-graphics-panel/
 
 ## Acceso privado
 
 El sitio no utiliza cuentas ni correos. El acceso se concede mediante un enlace-capacidad con este formato:
 
-`https://kratos561.github.io/cave-graphics-panel/#access=CLAVE_SECRETA`
+`https://isaaclorenzo.github.io/cave-graphics-panel/#access=CLAVE_SECRETA`
 
 La clave vive solamente en Supabase como un hash, nunca en este repositorio ni dentro de `index.html`. El navegador la guarda por sesion y elimina el fragmento de la barra de direcciones despues de validarlo.
 
@@ -24,13 +24,14 @@ Para revocar todos los enlaces, genera una clave nueva, calcula su SHA-256 y act
 - Todas las lecturas y escrituras pasan por `supabase/functions/cave-board`.
 - La funcion valida `x-cave-access` antes de consultar la tabla.
 - `SUPABASE_SERVICE_ROLE_KEY` solo existe dentro de la funcion Edge.
-- La funcion acepta unicamente el origen de GitHub Pages.
+- La funcion acepta unicamente los origenes de GitHub Pages: `https://isaaclorenzo.github.io` y el anterior `https://kratos561.github.io`. Para agregar otro, define el secreto `CAVE_ALLOWED_ORIGIN` (lista separada por comas).
 
 ## Supabase
 
 - `supabase/migrations/20260721_secure_cave_board.sql` cierra RLS y normaliza estados y prioridades.
 - `supabase/functions/cave-board/index.ts` contiene el backend protegido.
 - `supabase/config.toml` mantiene `verify_jwt = false` porque la funcion usa su propia clave-capacidad.
+- Tras cambiar la funcion, publicala con `supabase functions deploy cave-board`.
 
 ## Uso
 

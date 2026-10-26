@@ -1,17 +1,28 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const cors = {
-  "Access-Control-Allow-Origin": Deno.env.get("CAVE_ALLOWED_ORIGIN") ?? "https://kratos561.github.io",
-  "Access-Control-Allow-Headers": "content-type, x-cave-access",
-  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Vary": "Origin",
-};
+// GitHub Pages origins allowed to call this function. The account was renamed from
+// kratos561 to isaaclorenzo, so both are accepted. CAVE_ALLOWED_ORIGIN can add more
+// origins as a comma-separated list.
+const allowedOrigins = new Set([
+  "https://isaaclorenzo.github.io",
+  "https://kratos561.github.io",
+  ...(Deno.env.get("CAVE_ALLOWED_ORIGIN") ?? "").split(",").map((value) => value.trim().replace(/\/+$/, "")).filter(Boolean),
+]);
+
+function corsFor(origin: string | null) {
+  return {
+    "Access-Control-Allow-Origin": origin && allowedOrigins.has(origin) ? origin : "https://isaaclorenzo.github.io",
+    "Access-Control-Allow-Headers": "content-type, x-cave-access",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "Vary": "Origin",
+  };
+}
 
 const encoder = new TextEncoder();
 const statuses = new Set(["pendiente", "proceso", "listo"]);
 const priorities = new Set(["normal", "alta", "urgente"]);
 
-function response(body: unknown, status = 200) {
+function response(body: unknown, status: number, cors: Record<string, string>) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
@@ -99,14 +110,16 @@ function debtPayload(value: Record<string, unknown>) {
 }
 
 Deno.serve(async (request) => {
-  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   const origin = request.headers.get("origin");
-  if (origin && origin !== cors["Access-Control-Allow-Origin"]) return response({ error: "Origen no permitido." }, 403);
-  if (!await hasAccess(request)) return response({ error: "Acceso no autorizado." }, 401);
+  const cors = corsFor(origin);
+  const respond = (payload: unknown, status = 200) => response(payload, status, cors);
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (origin && !allowedOrigins.has(origin)) return respond({ error: "Origen no permitido." }, 403);
+  if (!await hasAccess(request)) return respond({ error: "Acceso no autorizado." }, 401);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRole) return response({ error: "Servicio no configurado." }, 500);
+  if (!supabaseUrl || !serviceRole) return respond({ error: "Servicio no configurado." }, 500);
   const database = createClient(supabaseUrl, serviceRole, { auth: { persistSession: false } });
 
   try {
@@ -124,7 +137,7 @@ Deno.serve(async (request) => {
       ]);
       if (error) throw error;
       if (debtsError) throw debtsError;
-      return response({ data, debts });
+      return respond({ data, debts });
     }
 
     const body = await request.json();
@@ -136,7 +149,7 @@ Deno.serve(async (request) => {
       const task = { id, ...taskPayload(supplied), created_at: Date.now(), updated_at: Date.now() };
       const { data, error } = await database.from("tasks").insert(task).select().single();
       if (error) throw error;
-      return response({ data }, 201);
+      return respond({ data }, 201);
     }
     if (operation === "update") {
       const id = string(body.id, 100);
@@ -144,7 +157,7 @@ Deno.serve(async (request) => {
       const patch = { ...taskPayload(body.task ?? {}, true), updated_at: Date.now() };
       const { data, error } = await database.from("tasks").update(patch).eq("id", id).select().single();
       if (error) throw error;
-      return response({ data });
+      return respond({ data });
     }
     if (operation === "delete") {
       const id = string(body.id, 100);
@@ -152,7 +165,7 @@ Deno.serve(async (request) => {
       const { data, error } = await database.from("tasks").delete().eq("id", id).select("id").maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("El proyecto ya no existe.");
-      return response({ ok: true });
+      return respond({ ok: true });
     }
     if (operation === "debt_insert") {
       const supplied = body.debt ?? {};
@@ -161,7 +174,7 @@ Deno.serve(async (request) => {
       const debt = { id, ...debtPayload(supplied), created_at: Date.now(), updated_at: Date.now() };
       const { data, error } = await database.from("debts").insert(debt).select().single();
       if (error) throw error;
-      return response({ data }, 201);
+      return respond({ data }, 201);
     }
     if (operation === "debt_delete") {
       const id = string(body.id, 100);
@@ -169,11 +182,11 @@ Deno.serve(async (request) => {
       const { data, error } = await database.from("debts").delete().eq("id", id).select("id").maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("El cobro ya no existe.");
-      return response({ ok: true });
+      return respond({ ok: true });
     }
-    return response({ error: "Operación no permitida." }, 400);
+    return respond({ error: "Operación no permitida." }, 400);
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo completar la solicitud.";
-    return response({ error: message }, 400);
+    return respond({ error: message }, 400);
   }
 });
