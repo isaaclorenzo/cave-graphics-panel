@@ -1,12 +1,14 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // Only the GitHub Pages site may call this function; requests without an allowed Origin
-// are rejected. The old kratos561 address is no longer trusted: that username is free and
-// anyone could claim it. CAVE_ALLOWED_ORIGIN can add origins as a comma-separated list.
+// are rejected. The old kratos561 address is never trusted, even if a leftover
+// CAVE_ALLOWED_ORIGIN secret still lists it: that username is free and anyone could claim it.
+// CAVE_ALLOWED_ORIGIN can add other origins as a comma-separated list.
+const revokedOrigins = new Set(["https://kratos561.github.io"]);
 const allowedOrigins = new Set([
   "https://isaaclorenzo.github.io",
   ...(Deno.env.get("CAVE_ALLOWED_ORIGIN") ?? "").split(",").map((value) => value.trim().replace(/\/+$/, "")).filter(Boolean),
-]);
+].filter((origin) => !revokedOrigins.has(origin)));
 
 function corsFor(origin: string | null) {
   return {

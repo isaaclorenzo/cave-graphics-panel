@@ -223,6 +223,7 @@
     const pending = state.outbox.length;
     if (!navigator.onLine || state.failures) setSync('offline', pending ? 'Sin conexión · ' + pending + ' por enviar' : 'Sin conexión');
     else if (pending) setSync('syncing', 'Guardando');
+    else if (!state.lastSync) setSync('syncing', 'Conectando');
     else setSync('live', 'En vivo');
     if (state.lastSync) els.lastSync.textContent = 'Sincronizado ' + new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' }).format(new Date(state.lastSync)) + ' · N nuevo · / buscar';
   }
