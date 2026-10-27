@@ -27,6 +27,7 @@ El sitio abre directamente, sin cuentas, correos ni claves. Cualquier persona qu
 - Valida cada campo, limita el tamano de las solicitudes y nunca devuelve detalles internos de la base de datos.
 - `activity_log` guarda una copia de cada alta, cambio y borrado (via triggers en la base de datos). Lo eliminado se recupera desde **Actividad**. Se conserva 180 dias.
 - La pagina declara una Content Security Policy: solo ejecuta scripts propios y solo se conecta con Supabase.
+- `contactos` (mensajes de formulario en la misma base de datos) solo acepta mensajes nuevos con la clave publica; leerlos, cambiarlos o borrarlos queda reservado al panel de Supabase (`20261028_protect_contactos.sql`).
 
 ## Supabase
 
