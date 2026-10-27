@@ -1,8 +1,10 @@
 name: Deploy Supabase Function
 
 # Publica supabase/functions/cave-board en Supabase cada vez que cambia en main.
-# Requiere el secreto SUPABASE_ACCESS_TOKEN (Supabase -> Account -> Access Tokens)
-# en Settings -> Secrets and variables -> Actions del repositorio.
+# Usa el secreto SUPABASE_ACCESS_TOKEN (Supabase -> Account -> Access Tokens) de
+# Settings -> Secrets and variables -> Actions. Al lanzarlo a mano se puede pasar
+# un token de un solo uso en "access_token"; se lee del evento y se enmascara para
+# que nunca aparezca en los registros.
 
 on:
   push:
@@ -10,8 +12,12 @@ on:
       - main
     paths:
       - supabase/functions/**
-      - .github/workflows/deploy-function.yml
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      access_token:
+        description: Token de Supabase de un solo uso (opcional si existe el secreto)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -23,14 +29,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Comprobar token
+      - name: Preparar token
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SECRET_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+          token=$(jq -r '.inputs.access_token // empty' "$GITHUB_EVENT_PATH")
+          if [ -n "$token" ]; then
+            echo "::add-mask::$token"
+          else
+            token="$SECRET_TOKEN"
+          fi
+          if [ -z "$token" ]; then
             echo "::error::Falta el secreto SUPABASE_ACCESS_TOKEN. Crealo en Supabase (Account -> Access Tokens) y agregalo en Settings -> Secrets and variables -> Actions."
             exit 1
           fi
+          echo "SUPABASE_ACCESS_TOKEN=$token" >> "$GITHUB_ENV"
 
       - name: Instalar Supabase CLI
         uses: supabase/setup-cli@v1
@@ -38,6 +51,12 @@ jobs:
           version: latest
 
       - name: Publicar cave-board
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase functions deploy cave-board --project-ref cgquvuclhkqxwebpgsdx
+        run: supabase functions deploy cave-board --project-ref cgquvuclhkqxwebpgsdx --use-api
+
+      - name: Comprobar que el tablero responde
+        run: |
+          sleep 10
+          code=$(curl -s -o /tmp/board.json -w '%{http_code}' -H "Origin: https://isaaclorenzo.github.io" https://cgquvuclhkqxwebpgsdx.supabase.co/functions/v1/cave-board)
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then jq -r '.error // "sin detalle"' /tmp/board.json; exit 1; fi
+          jq -r '"Proyectos: \(.data | length) (en papelera: \([.data[] | select(.deleted_at != null)] | length)) | Cobros sueltos: \(.debts | length)"' /tmp/board.json
